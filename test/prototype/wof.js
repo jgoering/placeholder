@@ -79,6 +79,7 @@ module.exports.store_record = function(test, util) {
           name: undefined,
           names: {},
           placetype: undefined,
+          rank: { min: -1, max: 0 },
           population: undefined,
           popularity: undefined,
           abbr: undefined,
@@ -143,7 +144,7 @@ module.exports.store_abbr = function(test, util) {
     mock.insertWofRecord(params({
       'wof:placetype': 'country',
       'wof:country_alpha3': 'TEST',
-      'wof:abbreviation': 'TEST2'
+      'wof:shortcode': 'TEST2'
     }), function(){
       t.deepEqual( mock._calls.set[0][1].abbr, 'TEST');
       t.end();
@@ -460,50 +461,65 @@ module.exports.getAbbreviation = function(test, util) {
 
     t.equal( undefined, wof.getAbbreviation({
       'wof:placetype': 'country',
-      'wof:abbreviation': 'TEST2'
+      'wof:shortcode': 'TEST2'
     }));
     t.equal( undefined, wof.getAbbreviation({
       'wof:placetype': 'dependency',
-      'wof:abbreviation': 'TEST2'
+      'wof:shortcode': 'TEST2'
     }));
 
     t.equal( 'TEST', wof.getAbbreviation({
       'wof:placetype': 'country',
       'wof:country_alpha3': 'TEST',
-      'wof:abbreviation': 'TEST2'
+      'wof:shortcode': 'TEST2'
     }));
     t.equal( 'TEST', wof.getAbbreviation({
       'wof:placetype': 'dependency',
       'wof:country_alpha3': 'TEST',
-      'wof:abbreviation': 'TEST2'
+      'wof:shortcode': 'TEST2'
     }));
 
     t.equal( 'TEST', wof.getAbbreviation({
       'wof:placetype': 'country',
       'ne:iso_a3': 'TEST',
-      'wof:abbreviation': 'TEST2'
+      'wof:shortcode': 'TEST2'
     }));
     t.equal( 'TEST', wof.getAbbreviation({
       'wof:placetype': 'dependency',
       'ne:iso_a3': 'TEST',
-      'wof:abbreviation': 'TEST2'
+      'wof:shortcode': 'TEST2'
     }));
 
     t.equal( 'TEST', wof.getAbbreviation({
       'wof:placetype': 'country',
       'wof:country_alpha3': 'TEST',
       'ne:iso_a3': 'TEST2',
-      'wof:abbreviation': 'TEST3'
+      'wof:shortcode': 'TEST3'
     }));
     t.equal( 'TEST', wof.getAbbreviation({
       'wof:placetype': 'dependency',
       'wof:country_alpha3': 'TEST',
       'ne:iso_a3': 'TEST2',
-      'wof:abbreviation': 'TEST3'
+      'wof:shortcode': 'TEST3'
     }));
     t.end();
   });
 
+  test( 'wof:shortcode', function(t) {
+    t.equal( 'TEST2', wof.getAbbreviation({
+      'ne:iso_a3': 'TEST',
+      'wof:shortcode': 'TEST2'
+    }));
+    t.equal( 'TEST2', wof.getAbbreviation({
+      'ne:iso_a3': 'TEST',
+      'wof:shortcode': 'TEST2'
+    }));
+    t.end();
+  });
+
+  // backwards compatibility for wof:abbreviation
+  // note: this property is deprecated, the code can be
+  // removed in the future.
   test( 'wof:abbreviation', function(t) {
     t.equal( 'TEST2', wof.getAbbreviation({
       'ne:iso_a3': 'TEST',
@@ -612,10 +628,10 @@ module.exports.add_token = function(test, util) {
     });
   });
 
-  test( 'wof:abbreviation', function(t) {
+  test( 'wof:shortcode', function(t) {
     var mock = new Mock();
     mock.insertWofRecord(params({
-      'wof:abbreviation': 'EXAMPLE'
+      'wof:shortcode': 'EXAMPLE'
     }), function(){
       t.deepEqual( mock._calls.setTokens[0][0], 1 );
       t.deepEqual( mock._calls.setTokens[0][1], [
@@ -888,6 +904,34 @@ module.exports.add_names = function(test, util) {
       'name:eng_x_preferred': [ 'A', 'B' ]
     }), function(){
       t.deepEqual( mock._calls.setTokens, [[ 1, [] ]] );
+      t.end();
+    });
+  });
+
+  test( 'pelias/placeholder#126: move iso639-2B to iso639-2T when iso639-2T is not found', function(t) {
+    var mock = new Mock();
+    mock.insertWofRecord(params({
+      'name:fre_x_preferred':['Normandie'],
+      'name:dut_x_preferred':['Normandië'],
+      'name:eng_x_preferred':['Normandy']
+    }), function(){
+      t.deepEqual( mock._calls.set.length, 1 );
+      t.deepEqual( mock._calls.set[0][1].names, { eng: ['Normandy'], fra: [ 'Normandie' ], nld: [ 'Normandië' ] });
+      t.end();
+    });
+  });
+
+  test( 'pelias/placeholder#126: select iso639-2T when both iso639-2T and iso639-2B are present', function(t) {
+    var mock = new Mock();
+    mock.insertWofRecord(params({
+      'name:fre_x_preferred':['iso639-2B Normandie'],
+      'name:fra_x_preferred':['iso639-2T Normandie'],
+      'name:dut_x_preferred':['iso639-2B Normandië'],
+      'name:nld_x_preferred':['iso639-2T Normandië'],
+      'name:eng_x_preferred':['Normandy']
+    }), function(){
+      t.deepEqual( mock._calls.set.length, 1 );
+      t.deepEqual( mock._calls.set[0][1].names, { eng: ['Normandy'], fra: [ 'iso639-2T Normandie' ], nld: [ 'iso639-2T Normandië' ] });
       t.end();
     });
   });
